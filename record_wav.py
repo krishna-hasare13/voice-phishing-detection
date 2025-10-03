@@ -2,7 +2,7 @@
 import sounddevice as sd
 import soundfile as sf
 
-DURATION = 10  # seconds
+DURATION = 5  # seconds
 SR = 16000     # sample rate
 FNAME = "sample.wav"
 

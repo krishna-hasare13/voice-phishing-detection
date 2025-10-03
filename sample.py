@@ -13,4 +13,7 @@ for name, text in samples.items():
     tts = gTTS(text=text, lang='en')
     tts.save(mp3)
     # convert mp3 to 16kHz mono WAV (whisper prefers 16kHz, but openai-whisper handles resampling too)
-    
+    subprocess.run([
+        "ffmpeg", "-y", "-i", mp3, "-ar", "16000", "-ac", "1", wav
+    ], check=True)
+

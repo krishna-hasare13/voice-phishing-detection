@@ -32,64 +32,6 @@ voice-phishing-detection/
 python
 Copy code
 
----
-
-## 🚀 All-in-One Backend Code
-
-```python
-# backend/app.py
-from fastapi import FastAPI, UploadFile, File
-import shutil, os
-import whisper
-from transformers import BertTokenizer, BertForSequenceClassification
-import torch
-
-app = FastAPI(title="Voice Phishing Detection 🚨")
-
-# -----------------------------
-# Setup Whisper Model
-# -----------------------------
-print("Loading Whisper model...")
-whisper_model = whisper.load_model("base")
-
-# -----------------------------
-# Setup BERT Model
-# -----------------------------
-print("Loading BERT model...")
-tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
-bert_model = BertForSequenceClassification.from_pretrained("bert-base-uncased", num_labels=2)
-
-# -----------------------------
-# Helper Function
-# -----------------------------
-def classify_text(text):
-    inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
-    outputs = bert_model(**inputs)
-    probs = torch.softmax(outputs.logits, dim=1)
-    return {"normal": float(probs[0][0]), "phishing": float(probs[0][1])}
-
-# -----------------------------
-# Upload & Analyze Endpoint
-# -----------------------------
-UPLOAD_DIR = "uploads"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-@app.post("/predict")
-async def predict(file: UploadFile = File(...)):
-    file_path = os.path.join(UPLOAD_DIR, file.filename)
-    
-    # Save uploaded file
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    
-    # Transcribe audio using Whisper
-    result = whisper_model.transcribe(file_path)
-    text = result["text"]
-    
-    # Classify text using BERT
-    prediction = classify_text(text)
-    
-    return {"transcription": text, "prediction": prediction}
 
 # -----------------------------
 # Run Server
@@ -101,6 +43,8 @@ bash
 Copy code
 git clone https://github.com/<your-username>/voice-phishing-detection.git
 cd voice-phishing-detection/backend
+
+
 2. Setup Python environment
 bash
 Copy code
@@ -110,6 +54,8 @@ python -m venv venv
 venv\Scripts\activate
 # Linux / Mac
 source venv/bin/activate
+
+
 3. Install dependencies
 bash
 Copy code

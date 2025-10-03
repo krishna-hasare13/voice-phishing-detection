@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Voice Phishing Detection</title>
+<title>Voice Phishing Detection Dashboard</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 <style>
     body {
-        background: #0f111a;
+        background: radial-gradient(circle at top left, #0f2027, #203a43, #2c5364);
         color: #e0e0e0;
         font-family: 'Segoe UI', sans-serif;
-        height: 100vh;
+        min-height: 100vh;
     }
     .header {
         text-align: center;
@@ -18,66 +18,99 @@
     .header h1 {
         color: #00ffc3;
         font-weight: bold;
-        letter-spacing: 1px;
-    }
-    .header p {
-        color: #a0a0a0;
+        text-shadow: 0px 0px 15px rgba(0,255,200,0.7);
     }
     .glass-card {
-        background: rgba(30,30,50,0.8);
-        backdrop-filter: blur(10px);
-        border-radius: 15px;
+        background: rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(12px);
+        border-radius: 20px;
         padding: 25px;
         margin-bottom: 20px;
-        border: 1px solid #333;
-        transition: transform 0.2s;
+        border: 1px solid rgba(255,255,255,0.1);
+        box-shadow: 0 0 15px rgba(0, 255, 195, 0.1);
     }
-    .glass-card:hover {
-        transform: scale(1.02);
-    }
-    input, button {
-        border-radius: 10px;
+    .glass-card h5 {
+        color: #00ffc3;
     }
     button {
-        background: #00ffc3;
+        background: linear-gradient(90deg, #00ffc3, #00aaff);
         border: none;
         color: #000;
         font-weight: bold;
-        transition: 0.2s;
+        border-radius: 12px;
+        transition: transform 0.2s, box-shadow 0.2s;
     }
     button:hover {
-        background: #00e6b0;
+        transform: scale(1.05);
+        box-shadow: 0 0 12px #00ffc3;
     }
     .chunk-card {
-        background: #1a1b2a;
+        background: rgba(20,20,30,0.9);
         border-left: 5px solid #00ffc3;
         margin-bottom: 15px;
-        padding: 15px;
-        border-radius: 10px;
+        padding: 20px;
+        border-radius: 12px;
+        animation: fadeIn 0.5s ease;
+    }
+    .chunk-card h6 {
+        color: #00aaff;
+    }
+    .badge {
+        font-size: 0.9rem;
+        padding: 6px 10px;
     }
     .badge-normal {
-        background-color: #00aaff;
+        background: #007bff;
     }
     .badge-phishing {
-        background-color: #ff4c4c;
+        background: #ff3b3b;
+    }
+    .progress {
+        height: 10px;
+        background: #2a2a40;
+        border-radius: 5px;
+        margin-bottom: 8px;
+    }
+    .progress-bar {
+        transition: width 0.6s ease;
     }
     #results {
         max-height: 400px;
         overflow-y: auto;
         padding-right: 10px;
     }
-    a {
-        text-decoration: none;
+    /* Fake waveform */
+    .waveform {
+        height: 40px;
+        background: repeating-linear-gradient(
+            90deg,
+            rgba(0,255,195,0.5),
+            rgba(0,255,195,0.5) 2px,
+            transparent 2px,
+            transparent 6px
+        );
+        animation: wave 1s linear infinite;
+        margin: 10px 0;
+        border-radius: 5px;
+    }
+    @keyframes wave {
+        from { background-position: 0 0; }
+        to { background-position: 40px 0; }
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
     }
 </style>
 </head>
 <body>
 <div class="container">
     <div class="header">
-        <h1>🛡️ Voice Phishing Detection</h1>
+        <h1>🛡️ Voice Phishing Detection Dashboard</h1>
+        <p>Real-time AI powered fraud detection</p>
     </div>
 
-    <div class="glass-card shadow-sm">
+    <div class="glass-card">
         <div class="mb-3">
             <label for="callId" class="form-label">Call ID</label>
             <input type="text" class="form-control" id="callId" placeholder="Enter Call ID">
@@ -91,6 +124,7 @@
             <input type="file" class="form-control" id="audioFile" accept=".wav">
         </div>
         <button class="btn w-100" onclick="uploadChunk()">🚀 Upload & Analyze</button>
+        <div class="waveform"></div>
     </div>
 
     <div id="results"></div>
@@ -124,13 +158,19 @@ async function uploadChunk() {
         const chunkDiv = document.createElement("div");
         chunkDiv.className = "chunk-card";
         chunkDiv.innerHTML = `
-            <h5>Chunk #${data.chunk_number}</h5>
+            <h6>📦 Chunk #${data.chunk_number}</h6>
             <p><strong>Transcript:</strong> ${data.transcript}</p>
-            <p>
-                <span class="badge badge-normal me-2">Normal ${data.prediction.normal.toFixed(2)}</span>
-                <span class="badge badge-phishing">Phishing ${data.prediction.phishing.toFixed(2)}</span>
-            </p>
-            <a href="${data.file_url}" target="_blank" class="btn btn-outline-light btn-sm">🎧 Listen</a>
+            <div>
+                <span class="badge badge-normal">Normal ${(data.prediction.normal*100).toFixed(1)}%</span>
+                <span class="badge badge-phishing">Phishing ${(data.prediction.phishing*100).toFixed(1)}%</span>
+            </div>
+            <div class="progress mt-2">
+                <div class="progress-bar bg-info" role="progressbar" style="width: ${(data.prediction.normal*100).toFixed(1)}%"></div>
+            </div>
+            <div class="progress">
+                <div class="progress-bar bg-danger" role="progressbar" style="width: ${(data.prediction.phishing*100).toFixed(1)}%"></div>
+            </div>
+            <a href="${data.file_url}" target="_blank" class="btn btn-outline-light btn-sm mt-2">🎧 Listen</a>
         `;
         resultsDiv.prepend(chunkDiv);
 

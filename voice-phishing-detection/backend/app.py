@@ -1,12 +1,16 @@
-from fastapi import FastAPI, UploadFile, Form
+from fastapi import FastAPI, UploadFile, Form, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from supabase import create_client, Client
 import whisper
 import torch
 from transformers import DistilBertTokenizer, DistilBertForSequenceClassification # type: ignore
 import os
 import uuid
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
+import time
+import json
+from typing import Dict, List
+import asyncio
 
 # ----------------------------
 # Supabase Setup
@@ -29,6 +33,13 @@ bert_model = DistilBertForSequenceClassification.from_pretrained("./classifier/s
 # ----------------------------
 app = FastAPI()
 
+# ----------------------------
+# Real-time Call Management
+# ----------------------------
+# Store active call sessions and WebSocket connections
+call_sessions: Dict[str, Dict] = {}
+active_connections: Dict[str, List[WebSocket]] = {}
+
 WEB_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "dashboard", "web")
 
 if not os.path.exists(WEB_DIR):
@@ -40,6 +51,10 @@ app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
 @app.get("/")
 async def root():
     return FileResponse(os.path.join(WEB_DIR, "index.html"))
+
+@app.get("/realtime")
+async def realtime_dashboard():
+    return FileResponse(os.path.join(WEB_DIR, "realtime.html"))
 
 @app.post("/upload_chunk/")
 async def upload_chunk(
@@ -99,3 +114,232 @@ async def upload_chunk(
         "prediction": {"normal": normal_score, "phishing": phishing_score},
         "file_url": file_url
     }
+
+# ----------------------------
+# Real-time Call Monitoring Endpoints
+# ----------------------------
+
+@app.post("/start_call_monitoring/")
+async def start_call_monitoring(call_id: str = Form(...)):
+    """Initialize monitoring for a new call"""
+    call_sessions[call_id] = {
+        "start_time": time.time(),
+        "chunks": [],
+        "phishing_alerts": [],
+        "status": "active"
+    }
+    
+    # Notify connected WebSocket clients
+    await broadcast_to_call(call_id, {
+        "type": "call_started",
+        "call_id": call_id,
+        "timestamp": time.time()
+    })
+    
+    return {"status": "monitoring_started", "call_id": call_id}
+
+@app.post("/upload_realtime_chunk/")
+async def upload_realtime_chunk(
+    file: UploadFile,
+    call_id: str = Form(...),
+    chunk_number: int = Form(...)
+):
+    """Handle real-time audio chunks with WebSocket notifications"""
+    
+    # Process chunk using existing logic
+    result = await upload_chunk(file, call_id, chunk_number)
+    
+    # Add timestamp for real-time tracking
+    result["timestamp"] = time.time()
+    
+    # Store in call session
+    if call_id in call_sessions:
+        call_sessions[call_id]["chunks"].append(result)
+    
+    # Check for phishing and send alerts if needed
+    phishing_score = result["prediction"]["phishing"]
+    
+    if phishing_score > 0.6:  # High phishing threshold
+        alert = await handle_phishing_alert(call_id, result)
+        result["alert"] = alert
+    
+    # Broadcast analysis update to WebSocket clients
+    await broadcast_to_call(call_id, {
+        "type": "analysis_update",
+        "call_id": call_id,
+        "chunk_number": chunk_number,
+        "transcript": result["transcript"],
+        "phishing_score": phishing_score,
+        "timestamp": result["timestamp"]
+    })
+    
+    return result
+
+@app.post("/finalize_call/")
+async def finalize_call(call_id: str = Form(...)):
+    """Finalize a call session"""
+    if call_id in call_sessions:
+        call_sessions[call_id]["status"] = "completed"
+        call_sessions[call_id]["end_time"] = time.time()
+        
+        # Calculate call summary
+        chunks = call_sessions[call_id]["chunks"]
+        total_chunks = len(chunks)
+        avg_phishing_score = sum(chunk["prediction"]["phishing"] for chunk in chunks) / total_chunks if total_chunks > 0 else 0
+        
+        summary = {
+            "call_id": call_id,
+            "total_chunks": total_chunks,
+            "average_phishing_score": avg_phishing_score,
+            "alerts_count": len(call_sessions[call_id]["phishing_alerts"]),
+            "duration": call_sessions[call_id].get("end_time", time.time()) - call_sessions[call_id]["start_time"]
+        }
+        
+        # Broadcast call ended
+        await broadcast_to_call(call_id, {
+            "type": "call_ended",
+            "call_id": call_id,
+            "summary": summary,
+            "timestamp": time.time()
+        })
+        
+        return {"status": "call_finalized", "summary": summary}
+    
+    return {"status": "call_not_found"}
+
+@app.get("/call_status/{call_id}")
+async def get_call_status(call_id: str):
+    """Get status of a specific call"""
+    if call_id in call_sessions:
+        return call_sessions[call_id]
+    return {"error": "Call not found"}
+
+@app.get("/active_calls/")
+async def get_active_calls():
+    """Get all active calls"""
+    active_calls = {
+        call_id: session for call_id, session in call_sessions.items()
+        if session["status"] == "active"
+    }
+    return {"active_calls": active_calls}
+
+# ----------------------------
+# WebSocket Support
+# ----------------------------
+
+@app.websocket("/ws/call_monitoring/{call_id}")
+async def websocket_endpoint(websocket: WebSocket, call_id: str):
+    """WebSocket for real-time call monitoring"""
+    await websocket.accept()
+    
+    # Add to active connections
+    if call_id not in active_connections:
+        active_connections[call_id] = []
+    active_connections[call_id].append(websocket)
+    
+    print(f"🔌 WebSocket connected for call: {call_id}")
+    
+    try:
+        # Send initial status
+        if call_id in call_sessions:
+            await websocket.send_text(json.dumps({
+                "type": "connection_established",
+                "call_id": call_id,
+                "session_data": call_sessions[call_id]
+            }))
+        
+        # Keep connection alive and handle incoming messages
+        while True:
+            try:
+                # Wait for messages (with timeout)
+                message = await asyncio.wait_for(websocket.receive_text(), timeout=1.0)
+                
+                # Handle client messages if needed
+                try:
+                    data = json.loads(message)
+                    await handle_websocket_message(call_id, websocket, data)
+                except json.JSONDecodeError:
+                    await websocket.send_text(json.dumps({
+                        "type": "error",
+                        "message": "Invalid JSON received"
+                    }))
+                    
+            except asyncio.TimeoutError:
+                # Send heartbeat to keep connection alive
+                await websocket.send_text(json.dumps({
+                    "type": "heartbeat",
+                    "timestamp": time.time()
+                }))
+                
+    except WebSocketDisconnect:
+        print(f"🔌 WebSocket disconnected for call: {call_id}")
+    except Exception as e:
+        print(f"❌ WebSocket error for call {call_id}: {e}")
+    finally:
+        # Remove from active connections
+        if call_id in active_connections:
+            active_connections[call_id] = [
+                conn for conn in active_connections[call_id] if conn != websocket
+            ]
+            if not active_connections[call_id]:
+                del active_connections[call_id]
+
+async def handle_websocket_message(call_id: str, websocket: WebSocket, data: dict):
+    """Handle incoming WebSocket messages from clients"""
+    message_type = data.get("type")
+    
+    if message_type == "ping":
+        await websocket.send_text(json.dumps({
+            "type": "pong",
+            "timestamp": time.time()
+        }))
+    elif message_type == "get_status":
+        if call_id in call_sessions:
+            await websocket.send_text(json.dumps({
+                "type": "status_response",
+                "call_id": call_id,
+                "data": call_sessions[call_id]
+            }))
+
+async def broadcast_to_call(call_id: str, message: dict):
+    """Broadcast message to all WebSocket connections for a call"""
+    if call_id in active_connections:
+        message_text = json.dumps(message)
+        disconnected = []
+        
+        for websocket in active_connections[call_id]:
+            try:
+                await websocket.send_text(message_text)
+            except Exception as e:
+                print(f"❌ Failed to send to WebSocket: {e}")
+                disconnected.append(websocket)
+        
+        # Remove disconnected WebSockets
+        for ws in disconnected:
+            active_connections[call_id].remove(ws)
+
+async def handle_phishing_alert(call_id: str, analysis_result: dict):
+    """Handle phishing alert and broadcast to clients"""
+    phishing_score = analysis_result["prediction"]["phishing"]
+    transcript = analysis_result["transcript"]
+    
+    alert = {
+        "type": "phishing_alert",
+        "call_id": call_id,
+        "severity": "high" if phishing_score > 0.8 else "medium",
+        "transcript": transcript,
+        "confidence": phishing_score,
+        "timestamp": time.time(),
+        "chunk_number": analysis_result["chunk_number"]
+    }
+    
+    # Store alert in call session
+    if call_id in call_sessions:
+        call_sessions[call_id]["phishing_alerts"].append(alert)
+    
+    # Broadcast alert
+    await broadcast_to_call(call_id, alert)
+    
+    print(f"🚨 PHISHING ALERT for call {call_id}: {phishing_score:.1%} confidence")
+    
+    return alert

@@ -80,7 +80,7 @@ class VoicePhishingDetectionSystem:
             return False
         
         try:
-            self.recorder.stop_call_recording()
+            self.recorder.stop_call_recording() # type: ignore
             print(f"✅ Monitoring stopped for call: {self.current_call}")
             self.current_call = None
             return True

@@ -422,6 +422,75 @@
             opacity: 0.3;
         }
 
+        /* Phishing Alert Overlay */
+        .phishing-alert-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            animation: alertFadeIn 0.3s ease-out;
+        }
+
+        .alert-content {
+            background: var(--card-bg);
+            border: 2px solid var(--danger-color);
+            border-radius: 16px;
+            padding: 2rem;
+            text-align: center;
+            max-width: 400px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            animation: alertSlideIn 0.4s ease-out;
+        }
+
+        .alert-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            animation: alertPulse 1s ease-in-out infinite;
+        }
+
+        .alert-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--danger-color);
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .alert-score {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--danger-color);
+            margin-bottom: 1rem;
+        }
+
+        .alert-message {
+            font-size: 1rem;
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        @keyframes alertFadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes alertSlideIn {
+            from { transform: translateY(-50px) scale(0.9); opacity: 0; }
+            to { transform: translateY(0) scale(1); opacity: 1; }
+        }
+
+        @keyframes alertPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
     </style>
 </head>
 <body>
@@ -479,7 +548,16 @@
                     chunksProcessed: 0,
                     totalPhishingScore: 0
                 };
+                
+                // Voice alert system
+                this.speechSynthesis = window.speechSynthesis;
+                this.alertThreshold = 0.57; // 57% threshold
+                this.lastAlertTime = 0;
+                this.alertCooldown = 10000; // 10 seconds cooldown between alerts
+                this.alertMessage = "Warning! This call may be phishing. Do not share any valuable information like passwords, credit card numbers, or personal details.";
+                
                 this.initializeUI();
+                this.initializeVoiceAlert();
                 this.updateSystemTime();
                 setInterval(() => this.updateSystemTime(), 1000);
                 this.startAutoDiscovery();
@@ -498,6 +576,92 @@
                         minute: '2-digit', 
                         second: '2-digit' 
                     });
+            }
+
+            initializeVoiceAlert() {
+                // Check if speech synthesis is supported
+                if (!this.speechSynthesis) {
+                    console.warn('⚠️ Speech Synthesis not supported in this browser');
+                    return;
+                }
+                
+                // Configure voice settings
+                this.voiceSettings = {
+                    rate: 1.0,
+                    pitch: 1.0,
+                    volume: 0.8,
+                    lang: 'en-US'
+                };
+                
+                console.log('🔊 Voice Alert System initialized - Threshold: 57%');
+            }
+
+            triggerVoiceAlert(phishingScore) {
+                const currentTime = Date.now();
+                const scorePercentage = (phishingScore * 100).toFixed(1);
+                
+                // Check cooldown to prevent spam alerts
+                if (currentTime - this.lastAlertTime < this.alertCooldown) {
+                    console.log(`🔇 Voice alert suppressed (cooldown active) - Score: ${scorePercentage}%`);
+                    return;
+                }
+                
+                // Check if score meets threshold
+                if (phishingScore < this.alertThreshold) {
+                    return;
+                }
+                
+                console.log(`🚨 PHISHING ALERT TRIGGERED - Score: ${scorePercentage}%`);
+                
+                // Create speech utterance
+                const utterance = new SpeechSynthesisUtterance(this.alertMessage);
+                utterance.rate = this.voiceSettings.rate;
+                utterance.pitch = this.voiceSettings.pitch;
+                utterance.volume = this.voiceSettings.volume;
+                utterance.lang = this.voiceSettings.lang;
+                
+                // Add event listeners
+                utterance.onstart = () => {
+                    console.log('🔊 Voice alert started');
+                    this.showVisualAlert(scorePercentage);
+                };
+                
+                utterance.onend = () => {
+                    console.log('🔊 Voice alert completed');
+                };
+                
+                utterance.onerror = (event) => {
+                    console.error('🔊 Voice alert error:', event.error);
+                };
+                
+                // Speak the warning
+                this.speechSynthesis.speak(utterance);
+                
+                // Update last alert time
+                this.lastAlertTime = currentTime;
+            }
+
+            showVisualAlert(scorePercentage) {
+                // Create visual alert overlay
+                const alertOverlay = document.createElement('div');
+                alertOverlay.className = 'phishing-alert-overlay';
+                alertOverlay.innerHTML = `
+                    <div class="alert-content">
+                        <div class="alert-icon">⚠️</div>
+                        <div class="alert-title">PHISHING DETECTED</div>
+                        <div class="alert-score">${scorePercentage}% Risk</div>
+                        <div class="alert-message">Do not share valuable information!</div>
+                    </div>
+                `;
+                
+                document.body.appendChild(alertOverlay);
+                
+                // Auto-remove after 5 seconds
+                setTimeout(() => {
+                    if (alertOverlay.parentNode) {
+                        alertOverlay.remove();
+                    }
+                }, 5000);
             }
 
             updateConnectionStatus(status) {
@@ -665,6 +829,9 @@
                 // Auto-scroll to show new content
                 container.scrollTop = 0;
                 
+                // Check for phishing alert trigger
+                this.triggerVoiceAlert(data.phishingScore);
+                
                 // Log to console for terminal visibility
                 console.log(`🎙️ Transcript [${scorePercentage}%]: "${data.transcript}"`);
             }
@@ -683,10 +850,6 @@
             console.log('🚀 Voice Phishing Detection Frontend Started');
             console.log('📡 Listening for backend data...');
             monitor = new VoicePhishingMonitor();
-        });
-    </script>
-</body>
-</html>
         });
     </script>
 </body>

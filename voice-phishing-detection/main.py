@@ -13,19 +13,19 @@ import argparse
 from datetime import datetime
 
 # Add project root to path
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+sys.path.append(os.path.dirname(os.path.dirname(_file_)))
 
 from client.linphone_recorder import LinphoneCallRecorder
 
 class VoicePhishingDetectionSystem:
-    def __init__(self, backend_url="http://127.0.0.1:8000", chunk_duration=5):
+    def _init_(self, backend_url="http://127.0.0.1:8000", chunk_duration=5):
         self.backend_url = backend_url
         self.chunk_duration = chunk_duration
         self.recorder = None
         self.is_running = False
         self.current_call = None
         
-        print("🛡️  Voice Phishing Detection System")
+        print("🛡  Voice Phishing Detection System")
         print("=" * 50)
         print(f"Backend URL: {backend_url}")
         print(f"Chunk Duration: {chunk_duration}s")
@@ -56,7 +56,7 @@ class VoicePhishingDetectionSystem:
             return False
         
         if self.current_call:
-            print("⚠️  Already monitoring a call. Stop current monitoring first.")
+            print("⚠  Already monitoring a call. Stop current monitoring first.")
             return False
         
         try:
@@ -76,11 +76,11 @@ class VoicePhishingDetectionSystem:
     def stop_monitoring(self):
         """Stop current call monitoring"""
         if not self.current_call:
-            print("⚠️  No active monitoring to stop")
+            print("⚠  No active monitoring to stop")
             return False
         
         try:
-            self.recorder.stop_call_recording()
+            self.recorder.stop_call_recording() # type: ignore
             print(f"✅ Monitoring stopped for call: {self.current_call}")
             self.current_call = None
             return True
@@ -147,7 +147,7 @@ class VoicePhishingDetectionSystem:
                     print(f"❌ Unknown command: {cmd}. Type 'help' for available commands.")
                     
             except KeyboardInterrupt:
-                print("\\n⏹️  Interrupted by user")
+                print("\\n⏹  Interrupted by user")
                 self.shutdown()
                 break
                 
@@ -164,7 +164,7 @@ class VoicePhishingDetectionSystem:
         print(f"🤖 Automatic Mode Started")
         
         if duration:
-            print(f"⏱️  Will run for {duration} seconds")
+            print(f"⏱  Will run for {duration} seconds")
         
         # Auto-start monitoring
         call_id = f"auto_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -183,7 +183,7 @@ class VoicePhishingDetectionSystem:
                         time.sleep(1)
                         
             except KeyboardInterrupt:
-                print("\\n⏹️  Interrupted by user")
+                print("\\n⏹  Interrupted by user")
             
             finally:
                 self.stop_monitoring()
@@ -321,5 +321,5 @@ Examples:
         system.shutdown()
         sys.exit(1)
 
-if __name__ == "__main__":
+if _name_ == "_main_":
     main()

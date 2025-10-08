@@ -522,7 +522,7 @@
                     </a>
                     <p class="mb-0 mt-1" style="color: var(--text-secondary);">Real-time Call Monitoring & Analysis</p>
                 </div>
-                <div class="col-md-4 text-end">
+                <div class="col-md-2 text-end">
                     <div id="systemTime" class="h5 mb-0" style="color: var(--text-secondary);"></div>
                 </div>
             </div>
@@ -549,9 +549,9 @@
     </div>
 
     <!-- Custom alert audio file (place phishing_alert.mp3 next to this HTML) -->
-    <audio id="phishingAlertAudio" preload="auto">
-    <source src="phishing_alert.mp3" type="audio/mpeg">
-    <source src="phishing_alert.ogg" type="audio/ogg">
+    <audio id="phishingAlertAudio" preload="auto" style="display: none;">
+    <source src="/static/phishing_alert.mp3" type="audio/mpeg">
+    <source src="/static/phishing_alert.ogg" type="audio/ogg">
     Your browser does not support the audio element.
 </audio>
 

@@ -48,6 +48,7 @@ if not os.path.exists(WEB_DIR):
 # Serve static files like JS/CSS/images
 app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
 
+
 @app.get("/")
 async def root():
     return FileResponse(os.path.join(WEB_DIR, "index.html"))

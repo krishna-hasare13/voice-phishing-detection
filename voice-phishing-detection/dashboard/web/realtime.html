@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>�️ Voice Phishing Detection - Real-time Monitor</title>
+    <title>🛡️ Voice Phishing Detection - Real-time Monitor</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -538,6 +538,9 @@
         </div>
     </div>
 
+    <!-- Custom alert audio file (place phishing_alert.mp3 next to this HTML) -->
+    <audio id="phishingAlertAudio" src="phishing_alert.mp3" preload="auto"></audio>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     
     <script>
@@ -561,6 +564,9 @@
                 this.updateSystemTime();
                 setInterval(() => this.updateSystemTime(), 1000);
                 this.startAutoDiscovery();
+
+                // Attempt to unlock audio on first user interaction (helps bypass autoplay restrictions)
+                this._setupInteractionToUnlockAudio();
             }
 
             initializeUI() {
@@ -582,7 +588,8 @@
                 // Check if speech synthesis is supported
                 if (!this.speechSynthesis) {
                     console.warn('⚠️ Speech Synthesis not supported in this browser');
-                    return;
+                } else {
+                    console.log('🔊 Speech Synthesis available');
                 }
                 
                 // Configure voice settings
@@ -595,6 +602,29 @@
                 
                 console.log('🔊 Voice Alert System initialized - Threshold: 57%');
             }
+
+           _setupInteractionToUnlockAudio() {
+    const audio = document.getElementById('phishingAlertAudio');
+    const unlockAudio = () => {
+        audio.play().then(() => {
+            audio.pause();
+            audio.currentTime = 0;
+            console.log('🔓 Audio unlocked');
+        }).catch(err => {
+            console.warn('Audio unlock failed:', err);
+        });
+    };
+
+    // Attach to start button click
+    const startBtn = document.getElementById('startMonitoringBtn');
+    if (startBtn) {
+        startBtn.addEventListener('click', () => {
+            unlockAudio();
+            this.startAutoDiscovery(); // Start your monitoring after user click
+            startBtn.style.display = 'none'; // hide button
+        });
+    }
+}
 
             triggerVoiceAlert(phishingScore) {
                 const currentTime = Date.now();
@@ -612,33 +642,61 @@
                 }
                 
                 console.log(`🚨 PHISHING ALERT TRIGGERED - Score: ${scorePercentage}%`);
+
+                // Play custom alert audio
+                const alertAudio = document.getElementById('phishingAlertAudio');
+                if (alertAudio) {
+                    try {
+                        alertAudio.currentTime = 0; // rewind to start
+                        const playPromise = alertAudio.play();
+                        if (playPromise !== undefined) {
+                            playPromise.catch(err => {
+                                // Autoplay may be blocked; fall back to TTS or visual alert
+                                console.warn('Audio play blocked or failed:', err);
+                                // Optionally fallback to speechSynthesis:
+                                // this._speakAlert();
+                                this.showVisualAlert(scorePercentage);
+                            }).then(() => {
+                                this.showVisualAlert(scorePercentage);
+                            });
+                        } else {
+                            // Older browsers - call directly and show visual
+                            this.showVisualAlert(scorePercentage);
+                        }
+                    } catch (e) {
+                        console.warn('Error playing alert audio:', e);
+                        this.showVisualAlert(scorePercentage);
+                    }
+                } else {
+                    // If audio element missing, fallback to TTS + visual
+                    // this._speakAlert();
+                    this.showVisualAlert(scorePercentage);
+                }
                 
-                // Create speech utterance
+                // Update last alert time
+                this.lastAlertTime = currentTime;
+            }
+
+            // Optional helper to use speech synthesis fallback (commented out by default)
+            _speakAlert() {
+                if (!this.speechSynthesis) return;
                 const utterance = new SpeechSynthesisUtterance(this.alertMessage);
                 utterance.rate = this.voiceSettings.rate;
                 utterance.pitch = this.voiceSettings.pitch;
                 utterance.volume = this.voiceSettings.volume;
                 utterance.lang = this.voiceSettings.lang;
                 
-                // Add event listeners
                 utterance.onstart = () => {
-                    console.log('🔊 Voice alert started');
-                    this.showVisualAlert(scorePercentage);
+                    console.log('🔊 Voice alert (TTS) started');
                 };
-                
                 utterance.onend = () => {
-                    console.log('🔊 Voice alert completed');
+                    console.log('🔊 Voice alert (TTS) ended');
                 };
-                
                 utterance.onerror = (event) => {
-                    console.error('🔊 Voice alert error:', event.error);
+                    console.error('🔊 Voice alert (TTS) error:', event.error);
                 };
                 
-                // Speak the warning
                 this.speechSynthesis.speak(utterance);
-                
-                // Update last alert time
-                this.lastAlertTime = currentTime;
             }
 
             showVisualAlert(scorePercentage) {
@@ -650,7 +708,7 @@
                         <div class="alert-icon">⚠️</div>
                         <div class="alert-title">PHISHING DETECTED</div>
                         <div class="alert-score">${scorePercentage}% Risk</div>
-                        <div class="alert-message">Do not share valuable information!</div>
+                        <div class="alert-message">It seems phishing — please don't share your information!</div>
                     </div>
                 `;
                 
@@ -849,6 +907,8 @@
         document.addEventListener('DOMContentLoaded', function() {
             console.log('🚀 Voice Phishing Detection Frontend Started');
             console.log('📡 Listening for backend data...');
+
+console.log('📡 Listening for backend data...');
             monitor = new VoicePhishingMonitor();
         });
     </script>

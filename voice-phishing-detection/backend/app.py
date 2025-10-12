@@ -139,42 +139,28 @@ async def start_call_monitoring(call_id: str = Form(...)):
     
     return {"status": "monitoring_started", "call_id": call_id}
 
-@app.post("/upload_realtime_chunk/")
-async def upload_realtime_chunk(
-    file: UploadFile,
-    call_id: str = Form(...),
-    chunk_number: int = Form(...)
-):
-    """Handle real-time audio chunks with WebSocket notifications"""
-    
-    # Process chunk using existing logic
-    result = await upload_chunk(file, call_id, chunk_number)
-    
-    # Add timestamp for real-time tracking
-    result["timestamp"] = time.time()
-    
-    # Store in call session
-    if call_id in call_sessions:
-        call_sessions[call_id]["chunks"].append(result)
-    
-    # Check for phishing and send alerts if needed
-    phishing_score = result["prediction"]["phishing"]
-    
-    if phishing_score > 0.6:  # High phishing threshold
-        alert = await handle_phishing_alert(call_id, result)
-        result["alert"] = alert
-    
-    # Broadcast analysis update to WebSocket clients
-    await broadcast_to_call(call_id, {
-        "type": "analysis_update",
-        "call_id": call_id,
-        "chunk_number": chunk_number,
-        "transcript": result["transcript"],
-        "phishing_score": phishing_score,
-        "timestamp": result["timestamp"]
-    })
-    
-    return result
+    @app.post("/upload_realtime_chunk/")
+    async def upload_realtime_chunk(
+        file: UploadFile,
+        call_id: str = Form(...),
+        chunk_number: int = Form(...)
+    ):
+        try:
+            content = await file.read()
+
+            # Create unique filename: call_id/chunk_number_uuid.wav
+            filename = f"{call_id}/chunk_{chunk_number}_{uuid.uuid4().hex[:8]}.wav"
+
+            # Upload to Supabase bucket 'audio-chunks'
+            res = supabase.storage.from_("audio-chunks").upload(filename, content)
+
+            if "Key" in res or res.get("Key"):
+                return {"status": "success", "filename": filename}
+            else:
+                return {"status": "failed", "response": res}
+
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
 
 @app.post("/finalize_call/")
 async def finalize_call(call_id: str = Form(...)):

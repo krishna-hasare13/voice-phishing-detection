@@ -1,116 +1,130 @@
-# Voice Phishing Detection 🚨
+# 🛡️ Voice Phishing Detection System
 
-A real-time AI-powered **voice phishing (vishing) detection system** integrated with Linphone (VoIP softphone) to detect suspicious calls and protect users from fraud.  
-
-This project leverages **OpenAI Whisper** for transcription and **BERT** for phishing classification.
-
----
-
-## 🛠️ Features
-
-- Real-time detection of voice phishing calls.
-- Integration with Linphone to capture live call audio.
-- Converts audio into text using Whisper.
-- Classifies conversation segments as **phishing** or **normal** using BERT.
-- Provides live alerts for suspicious calls.
-- Modular architecture: client (Linphone), backend (FastAPI + AI), dashboard (optional).
+A simple, real-time system to detect phishing in phone calls using speech-to-text and AI.  
+You get a web dashboard, backend, and a client to record/upload audio.
 
 ---
 
-## 📂 Repo Structure
+## 🚀 Quick Start
 
-voice-phishing-detection/
-├── client/ # Linphone integration & audio chunking
-├── backend/ # FastAPI + Whisper + BERT
-├── dashboard/ # Web dashboard (optional)
-├── data/ # Sample call recordings for testing
-├── docs/ # Project docs & demo plan
-├── tests/ # Unit & integration tests
-├── README.md
-└── LICENSE
+### 1. **Clone the Project**
 
-python
-Copy code
+```sh
+git clone <your-repo-url>
+cd voice-phishing-detection
+```
 
+---
 
-# -----------------------------
-# Run Server
-# -----------------------------
-# Command to run: uvicorn app:app --reload
-⚡ Installation & Setup
-1. Clone the repo
-bash
-Copy code
-git clone https://github.com/<your-username>/voice-phishing-detection.git
-cd voice-phishing-detection/backend
+### 2. **Install Python Dependencies**
 
-
-2. Setup Python environment
-bash
-Copy code
+```sh
 python -m venv venv
-# Activate virtual environment
-# Windows
-venv\Scripts\activate
-# Linux / Mac
-source venv/bin/activate
+venv\Scripts\activate   # On Windows
+# or
+source venv/bin/activate   # On Linux/Mac
 
+pip install -r requirements.txt
+```
 
-3. Install dependencies
-bash
-Copy code
-pip install fastapi uvicorn openai-whisper torch torchvision torchaudio transformers
-🏃‍♂️ Run Backend Server
-bash
-Copy code
-uvicorn app:app --reload
-Server runs at: http://127.0.0.1:8000
+---
 
-Open Swagger docs to test endpoints: http://127.0.0.1:8000/docs
+### 3. **Supabase Setup**
 
-🧪 Testing API
-Using Swagger Docs
-Go to http://127.0.0.1:8000/docs
+#### a. **Create a Supabase Project**
+- Go to [https://app.supabase.com/](https://app.supabase.com/) and create a new project.
 
-Find /predict endpoint.
+#### b. **Get Your Supabase URL and API Key**
+- In your Supabase project, go to **Project Settings → API**.
+- Copy the **Project URL** and **anon public API key**.
 
-Click Try it out, upload a .wav file, and click Execute.
+#### c. **Create a Table**
+- Go to **Table Editor** in Supabase.
+- Click **New Table** and name it `chunks`.
+- Add these columns:
+    | Name           | Type      |
+    |----------------|-----------|
+    | id             | bigint    | (Primary key, auto-increment)
+    | call_id        | text      |
+    | chunk_number   | int4      |
+    | chunk_name     | text      |
+    | file_url       | text      |
+    | transcript     | text      |
+    | phishing_score | float8    |
+    | created_at     | timestamp | (default: now())
 
-Response example:
+#### d. **Create a Storage Bucket**
+- Go to **Storage** in Supabase.
+- Create a bucket named `audio-chunks`.
 
-json
-Copy code
-{
-  "transcription": "Hello, we are calling from your bank...",
-  "prediction": {
-    "normal": 0.12,
-    "phishing": 0.88
-  }
-}
-Using Python Script
-python
-Copy code
-import requests
+---
 
-url = "http://127.0.0.1:8000/predict"
-files = {"file": open("sample_audio.wav", "rb")}
+### 4. **Configure Your Keys**
 
-response = requests.post(url, files=files)
-print(response.json())
-🏗️ How It Works
-Client (Linphone) records call audio in 10-second chunks.
+- Open `backend/app.py`.
+- Find these lines at the top:
+  ```python
+  SUPABASE_URL = "Your-Supabase-URL"
+  SUPABASE_KEY = "Your-Supabase-API-Key"
+  ```
+- Paste your Supabase URL and API key here.
 
-Backend transcribes audio using Whisper.
+---
 
-BERT model predicts whether the conversation is phishing or normal.
+### 5. **Download/Place the AI Model**
 
-Dashboard (optional) displays live alerts.
+- Download or copy the `saved_model` folder (DistilBERT) into:  
+  `classifier/saved_model/`
+- If you use Whisper, make sure it downloads automatically or is available.
 
-📈 Future Improvements
-Full real-time RTP audio streaming integration with Linphone SDK.
+---
 
-Enhanced BERT model trained on larger vishing dataset.
+### 6. **Run the Backend**
 
-Mobile-friendly dashboard for instant alerts.
+```sh
+uvicorn backend.app:app --reload
+```
+- The API runs at [http://127.0.0.1:8000/](http://127.0.0.1:8000/)
+- The dashboard is at [http://127.0.0.1:8000/static/realtime.html](http://127.0.0.1:8000/static/realtime.html)
 
-Integration with notifications for end-users.
+---
+
+### 7. **Run the Client (Recorder)**
+
+- Edit `client/linphone_recorder.py` if you need to set the backend URL.
+- Run:
+  ```sh
+  python client/linphone_recorder.py
+  ```
+
+---
+
+### 8. **Use the Dashboard**
+
+- Open the dashboard in your browser.
+- Click **Start Monitoring** to see real-time transcripts and phishing alerts.
+
+---
+
+## 🛠️ Troubleshooting
+
+- **Keys not working?** Double-check your Supabase URL and API key.
+- **No data in dashboard?** Make sure your Supabase table and bucket names match exactly.
+- **Model errors?** Ensure `classifier/saved_model/` exists and is not empty.
+
+---
+
+## 📋 Summary
+
+- **Supabase**: Used for storing audio metadata and files.
+- **Keys**: Set in `backend/app.py`.
+- **Table**: Name it `chunks` with the columns above.
+- **Bucket**: Name it `audio-chunks`.
+- **Start backend**: `uvicorn backend.app:app --reload`
+- **Start client**: `python client/linphone_recorder.py`
+- **Dashboard**: Open `/static/realtime.html` in your browser.
+
+---
+
+**Need help?**  
+Open an issue or ask in the project discussions!

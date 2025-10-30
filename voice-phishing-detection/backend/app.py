@@ -19,8 +19,8 @@ load_dotenv()
 # ----------------------------
 # Supabase Setup
 # ----------------------------
-SUPABASE_URL = "Your-Supabase-URL"
-SUPABASE_KEY = "Your-Supabase-API-Key"
+SUPABASE_URL = "https://gjwcexivvjhunbdnhepx.supabase.com"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdqd2NleGl2dmpodW5iZG5oZXB4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1OTUwMTQ0OSwiZXhwIjoyMDc1MDc3NDQ5fQ.P4nz5LMH1V3qunT-_lnF_65BvqQJsZ0xiBgVGj_tMXQ"
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ----------------------------

@@ -27,8 +27,10 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # Load Whisper + DistilBERT
 # ----------------------------
 whisper_model = whisper.load_model("base")
-tokenizer = DistilBertTokenizer.from_pretrained("./classifier/saved_model")
-bert_model = DistilBertForSequenceClassification.from_pretrained("./classifier/saved_model")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_DIR = os.path.join(BASE_DIR, "classifier", "saved_model")
+tokenizer = DistilBertTokenizer.from_pretrained(MODEL_DIR)
+bert_model = DistilBertForSequenceClassification.from_pretrained(MODEL_DIR)
 
 # ----------------------------
 # FastAPI App
@@ -319,3 +321,7 @@ async def handle_phishing_alert(call_id: str, analysis_result: dict):
     await broadcast_to_call(call_id, alert)
     print(f"🚨 PHISHING ALERT for call {call_id}: {phishing_score:.1%} confidence")
     return alert
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

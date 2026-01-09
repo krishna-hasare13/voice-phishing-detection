@@ -4,9 +4,12 @@ uvicorn[standard]==0.24.0
 python-multipart==0.0.6
 
 # AI/ML Dependencies
+# Using cpu version of torch for smaller slug size if possible, 
+# but simply listing it here uses standard. 
+# Render free tier might struggle with large torch.
 torch==2.1.1
 transformers==4.35.2
-whisper==1.1.10
+openai-whisper
 numpy==1.24.3
 
 # Database
@@ -14,10 +17,6 @@ supabase==2.1.0
 
 # Real-time Communication
 websockets==12.0
-
-# Audio Processing (for Linphone integration)
-pyaudio==0.2.13
-websocket-client==1.6.4
 
 # Utility
 requests==2.31.0

@@ -26,7 +26,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # ----------------------------
 # Load Whisper + DistilBERT
 # ----------------------------
-whisper_model = whisper.load_model("base")
+whisper_model = whisper.load_model("tiny")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_DIR = os.path.join(BASE_DIR, "classifier", "saved_model")
 tokenizer = DistilBertTokenizer.from_pretrained(MODEL_DIR)

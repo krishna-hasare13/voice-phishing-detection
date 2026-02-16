@@ -256,7 +256,7 @@ class LinphoneCallRecorder:
                 f"{self.backend_url}/upload_realtime_chunk/",
                 files=files,
                 data=data,
-                timeout=10
+                timeout=60
             )
             
             if response.status_code == 200:

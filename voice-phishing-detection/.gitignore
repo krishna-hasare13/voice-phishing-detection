@@ -1,58 +1,44 @@
+# Environment variables
+.env
+.env.local
+.env.production
+
 # Python
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
-*.pyc
-*.pyd
-*.pdb
-*.egg
-*.egg-info/
-dist/
-build/
-.eggs/
-.env
-.venv
+*$py.class
+*.so
+.Python
 venv/
-ENV/
 env/
-pip-log.txt
-pip-delete-this-directory.txt
+ENV/
+backend/venv/
 
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# VSCode
+# IDEs
 .vscode/
+.idea/
+*.swp
+*.swo
+*~
 
-# OS files
+# OS
 .DS_Store
 Thumbs.db
 
-# Model and temp files
-classifier/saved_model/
+# Temporary files
 temp/
-*.wav
-*.mp3
-*.ogg
-*.webm
-
-# Supabase secrets (if any)
-.supabase/
-
-# Logs
 *.log
+*.tmp
 
-# Backup files
-*~
-*.bak
-*.swp
-*.swo
+# Model cache
+.cache/
+*.pt
+*.pth
 
-# Node (if you ever use npm for frontend)
-node_modules/
-npm-debug.log
+# Jupyter
+.ipynb_checkpoints/
 
-# Ignore uploads and user data
-uploads/
-audio-chunks/
+# Distribution
+build/
+dist/
+*.egg-info/

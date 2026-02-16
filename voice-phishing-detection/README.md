@@ -1,11 +1,18 @@
 # 🛡️ Voice Phishing Detection System
 
 A simple, real-time system to detect phishing in phone calls using speech-to-text and AI.  
-You get a web dashboard, backend, and a client to record/upload audio.
+**Now with a user-friendly Control Panel - no technical knowledge required!**
+
+## ✨ New Features
+
+- 🎨 **Control Panel Dashboard** - One-click start/stop detection
+- ☁️ **Deployment Ready** - Works on any cloud platform (Render, Railway, Heroku)
+- 🚫 **No Temp Folders** - In-memory processing for cloud compatibility
+- 🔒 **Secure** - Environment variable support for credentials
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start (For Users)
 
 ### 1. **Clone the Project**
 
@@ -82,14 +89,31 @@ pip install -r requirements.txt
 ### 6. **Run the Backend**
 
 ```sh
-uvicorn backend.app:app --reload
+backend\venv\Scripts\python -m uvicorn backend.app:app --reload
 ```
 - The API runs at [http://127.0.0.1:8000/](http://127.0.0.1:8000/)
-- The dashboard is at [http://127.0.0.1:8000/static/realtime.html](http://127.0.0.1:8000/static/realtime.html)
 
 ---
 
-### 7. **Run the Client (Recorder)**
+### 7. **Use the Control Panel** ⭐ NEW!
+
+**For Non-Technical Users:**
+
+1. Open your browser and go to: [http://127.0.0.1:8000/control](http://127.0.0.1:8000/control)
+2. Click the **"Start Detection"** button
+3. Allow microphone access when prompted
+4. Speak or make calls - the system will analyze in real-time!
+5. Click **"Stop Detection"** when done
+
+**That's it! No terminal commands needed!**
+
+**Alternative Dashboards:**
+- **Upload Files**: [http://127.0.0.1:8000/upload](http://127.0.0.1:8000/upload)
+- **Real-time Monitor**: [http://127.0.0.1:8000/realtime](http://127.0.0.1:8000/realtime)
+
+---
+
+### 8. **Run the Client (Advanced Users)**
 
 - Edit `client/linphone_recorder.py` if you need to set the backend URL.
 - Run:
@@ -117,12 +141,33 @@ uvicorn backend.app:app --reload
 ## 📋 Summary
 
 - **Supabase**: Used for storing audio metadata and files.
-- **Keys**: Set in `backend/app.py`.
+- **Keys**: Set via environment variables or defaults in `backend/app.py`.
 - **Table**: Name it `chunks` with the columns above.
 - **Bucket**: Name it `audio-chunks`.
-- **Start backend**: `uvicorn backend.app:app --reload`
-- **Start client**: `python client/linphone_recorder.py`
-- **Dashboard**: Open `/static/realtime.html` in your browser.
+- **Control Panel**: [http://127.0.0.1:8000/control](http://127.0.0.1:8000/control)
+- **Upload Page**: [http://127.0.0.1:8000/upload](http://127.0.0.1:8000/upload)
+- **Real-time Monitor**: [http://127.0.0.1:8000/realtime](http://127.0.0.1:8000/realtime)
+
+---
+
+## ☁️ Deployment
+
+**Ready to deploy to production?**
+
+This project is now **deployment-ready** with:
+- ✅ In-memory processing (no temp folder issues)
+- ✅ Environment variable support
+- ✅ User-friendly control panel
+- ✅ Cloud platform compatibility
+
+**See detailed deployment guides:**
+- 📖 **[DEPLOYMENT.md](DEPLOYMENT.md)** - Step-by-step deployment instructions
+- 📝 **[DEPLOYMENT_SUMMARY.md](DEPLOYMENT_SUMMARY.md)** - Overview of changes and features
+
+**Recommended platforms:**
+- [Render](https://render.com) (Free tier available)
+- [Railway](https://railway.app)
+- [Heroku](https://heroku.com)
 
 ---
 

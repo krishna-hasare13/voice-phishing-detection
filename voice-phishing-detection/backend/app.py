@@ -19,8 +19,9 @@ load_dotenv()
 # ----------------------------
 # Supabase Setup
 # ----------------------------
-SUPABASE_URL = "https://gjwcexivvjhunbdnhepx.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdqd2NleGl2dmpodW5iZG5oZXB4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1OTUwMTQ0OSwiZXhwIjoyMDc1MDc3NDQ5fQ.P4nz5LMH1V3qunT-_lnF_65BvqQJsZ0xiBgVGj_tMXQ"
+# Load from environment variables (for deployment) or use defaults (for local dev)
+SUPABASE_URL = os.getenv("SUPABASE_URL", "https://gjwcexivvjhunbdnhepx.supabase.co")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdqd2NleGl2dmpodW5iZG5oZXB4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1OTUwMTQ0OSwiZXhwIjoyMDc1MDc3NDQ5fQ.P4nz5LMH1V3qunT-_lnF_65BvqQJsZ0xiBgVGj_tMXQ")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ----------------------------
@@ -55,30 +56,44 @@ async def _process_and_store_chunk(file: UploadFile, call_id: str, chunk_number:
     """
     This single function now contains all the core logic for processing a chunk.
     It's called by both the real-time and standard upload endpoints.
+    Uses in-memory processing to avoid filesystem issues in cloud deployments.
     """
-    # Step 1: Save chunk locally
+    import io
+    import tempfile
+    
+    # Step 1: Read file content into memory
     filename = f"{call_id}_{chunk_number}_{uuid.uuid4()}.wav"
-    filepath = f"temp/{filename}"
-    os.makedirs("temp", exist_ok=True)
-    with open(filepath, "wb") as f:
-        f.write(await file.read())
-
-    # Step 2: Upload chunk to Supabase Storage
+    file_content = await file.read()
+    
+    # Step 2: Upload chunk to Supabase Storage (from memory)
     bucket = "audio-chunks"
-    supabase.storage.from_(bucket).upload(filename, filepath)
+    supabase.storage.from_(bucket).upload(filename, file_content)
     file_url = f"{SUPABASE_URL}/storage/v1/object/public/{bucket}/{filename}"
-
-    # Step 3: Transcribe with Whisper
-    result = whisper_model.transcribe(filepath)
-    transcript = result["text"]
-
+    
+    # Step 3: Transcribe with Whisper (using temporary file for whisper compatibility)
+    # Whisper requires a file path, so we use a named temporary file
+    # On Windows, we need delete=False to avoid permission issues
+    temp_audio = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+    try:
+        temp_audio.write(file_content)
+        temp_audio.flush()
+        temp_audio.close()  # Close before Whisper opens it
+        result = whisper_model.transcribe(temp_audio.name)
+        transcript = result["text"]
+    finally:
+        # Clean up the temp file
+        try:
+            os.unlink(temp_audio.name)
+        except:
+            pass
+    
     # Step 4: Classify with DistilBERT
     inputs = tokenizer(transcript, return_tensors="pt", truncation=True)
     outputs = bert_model(**inputs)  # type: ignore
     probs = torch.softmax(outputs.logits, dim=1)
     normal_score = float(probs[0][0])
     phishing_score = float(probs[0][1])
-
+    
     # Step 5: Insert metadata into Supabase table
     supabase.table("chunks").insert({
         "call_id": call_id,
@@ -89,8 +104,6 @@ async def _process_and_store_chunk(file: UploadFile, call_id: str, chunk_number:
         "phishing_score": phishing_score
     }).execute()
 
-    # Step 6: Cleanup local file
-    os.remove(filepath)
 
     return {
         "call_id": call_id,
@@ -103,6 +116,11 @@ async def _process_and_store_chunk(file: UploadFile, call_id: str, chunk_number:
 
 @app.get("/")
 async def root():
+    return FileResponse(os.path.join(WEB_DIR, "realtime.html"))
+
+
+@app.get("/upload")
+async def upload_page():
     return FileResponse(os.path.join(WEB_DIR, "index.html"))
 
 

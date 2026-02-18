@@ -572,7 +572,7 @@
             async startAutoDiscovery() {
                 setInterval(async () => {
                     try {
-                        const res = await fetch('http://127.0.0.1:8000/active_calls');
+                        const res = await fetch('/active_calls');
                         if (res.ok) {
                             const data = await res.json();
                             this.updateConnectionStatus('connected');
@@ -599,7 +599,8 @@
             }
 
             connectToCall(callId) {
-                const ws = new WebSocket(`ws://127.0.0.1:8000/ws/call_monitoring/${callId}`);
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const ws = new WebSocket(`${protocol}//${window.location.host}/ws/call_monitoring/${callId}`);
                 ws.onopen = () => this.activeSockets.set(callId, ws);
                 ws.onmessage = (e) => {
                     try {
@@ -662,7 +663,7 @@
                     this.chunkNumber = 0;
 
                     // Initialize call monitoring on backend
-                    await fetch('http://127.0.0.1:8000/start_call_monitoring/', {
+                    await fetch('/start_call_monitoring/', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                         body: `call_id=${this.currentCallId}`
@@ -688,14 +689,14 @@
                         }
                     };
 
-                    // Record in 10-second chunks
+                    // Record in 3-second chunks (more responsive)
                     this.mediaRecorder.start();
                     this.recordingInterval = setInterval(() => {
                         if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
                             this.mediaRecorder.stop();
                             this.mediaRecorder.start();
                         }
-                    }, 10000);
+                    }, 3000);
 
                     // Update UI
                     this.isRecording = true;
@@ -734,7 +735,7 @@
 
                 // Finalize call
                 if (this.currentCallId) {
-                    await fetch('http://127.0.0.1:8000/finalize_call/', {
+                    await fetch('/finalize_call/', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                         body: `call_id=${this.currentCallId}`
@@ -758,7 +759,7 @@
                 formData.append('chunk_number', this.chunkNumber);
 
                 try {
-                    const response = await fetch('http://127.0.0.1:8000/upload_realtime_chunk/', {
+                    const response = await fetch('/upload_realtime_chunk/', {
                         method: 'POST',
                         body: formData
                     });

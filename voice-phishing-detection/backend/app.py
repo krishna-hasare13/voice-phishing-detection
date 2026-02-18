@@ -8,7 +8,7 @@ from typing import Dict, List
 
 import torch
 import whisper
-from fastapi import FastAPI, Form, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Form, UploadFile, WebSocket, WebSocketDisconnect, BackgroundTasks
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from supabase import Client, create_client
@@ -51,59 +51,81 @@ if not os.path.exists(WEB_DIR):
 app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
 
 
-# --- Core Logic Helper Function ---
-async def _process_and_store_chunk(file: UploadFile, call_id: str, chunk_number: int):
+
+def _background_sb_upload(filename: str, file_content: bytes, call_id: str, chunk_number: int, transcript: str, phishing_score: float, file_url: str):
+    """Background task for Supabase operations"""
+    try:
+        # Upload chunk to Supabase Storage
+        bucket = "audio-chunks"
+        supabase.storage.from_(bucket).upload(filename, file_content)
+        
+        # Insert metadata into Supabase table
+        supabase.table("chunks").insert({
+            "call_id": call_id,
+            "chunk_number": chunk_number,
+            "chunk_name": filename,
+            "file_url": file_url,
+            "transcript": transcript,
+            "phishing_score": phishing_score
+        }).execute()
+        print(f"✅ [Background] Saved chunk {chunk_number} for call {call_id}")
+    except Exception as e:
+        print(f"❌ [Background] Error saving chunk {chunk_number}: {e}")
+
+async def _process_and_store_chunk(file: UploadFile, call_id: str, chunk_number: int, background_tasks: BackgroundTasks):
     """
-    This single function now contains all the core logic for processing a chunk.
-    It's called by both the real-time and standard upload endpoints.
-    Uses in-memory processing to avoid filesystem issues in cloud deployments.
+    Optimized core logic:
+    1. Transcribe & Classify (Blocking, critical for UI)
+    2. Offload Storage/DB to BackgroundTasks (Non-critical for real-time UI)
     """
-    import io
     import tempfile
     
     # Step 1: Read file content into memory
     filename = f"{call_id}_{chunk_number}_{uuid.uuid4()}.wav"
     file_content = await file.read()
     
-    # Step 2: Upload chunk to Supabase Storage (from memory)
+    # Pre-calculate file URL (predictable)
     bucket = "audio-chunks"
-    supabase.storage.from_(bucket).upload(filename, file_content)
     file_url = f"{SUPABASE_URL}/storage/v1/object/public/{bucket}/{filename}"
     
-    # Step 3: Transcribe with Whisper (using temporary file for whisper compatibility)
-    # Whisper requires a file path, so we use a named temporary file
-    # On Windows, we need delete=False to avoid permission issues
+    # Step 2: Transcribe with Whisper (File I/O + Inference)
     temp_audio = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+    transcript = ""
     try:
         temp_audio.write(file_content)
         temp_audio.flush()
-        temp_audio.close()  # Close before Whisper opens it
+        temp_audio.close()
+        # "tiny" model is fast, but better to use CPU threads if possible
+        # We perform this *before* returning because the UI needs the transcript
         result = whisper_model.transcribe(temp_audio.name)
         transcript = result["text"]
+    except Exception as e:
+        print(f"Transcription error: {e}")
+        transcript = "[Error during transcription]"
     finally:
-        # Clean up the temp file
         try:
             os.unlink(temp_audio.name)
         except:
             pass
     
-    # Step 4: Classify with DistilBERT
+    # Step 3: Classify with DistilBERT
     inputs = tokenizer(transcript, return_tensors="pt", truncation=True)
-    outputs = bert_model(**inputs)  # type: ignore
+    outputs = bert_model(**inputs)
     probs = torch.softmax(outputs.logits, dim=1)
     normal_score = float(probs[0][0])
     phishing_score = float(probs[0][1])
     
-    # Step 5: Insert metadata into Supabase table
-    supabase.table("chunks").insert({
-        "call_id": call_id,
-        "chunk_number": chunk_number,
-        "chunk_name": filename,
-        "file_url": file_url,
-        "transcript": transcript,
-        "phishing_score": phishing_score
-    }).execute()
-
+    # Step 4: Offload Supabase operations to background
+    background_tasks.add_task(
+        _background_sb_upload,
+        filename,
+        file_content,
+        call_id,
+        chunk_number,
+        transcript,
+        phishing_score,
+        file_url
+    )
 
     return {
         "call_id": call_id,
@@ -132,6 +154,7 @@ async def realtime_dashboard():
 @app.post("/upload_chunk/")
 async def upload_chunk(
     file: UploadFile,
+    background_tasks: BackgroundTasks,
     call_id: str = Form(...),
     chunk_number: int = Form(...),
 ):
@@ -139,7 +162,7 @@ async def upload_chunk(
     Standard endpoint for uploading a single chunk.
     It now simply calls the core processing function.
     """
-    return await _process_and_store_chunk(file, call_id, chunk_number)
+    return await _process_and_store_chunk(file, call_id, chunk_number, background_tasks)
 
 # ----------------------------
 # Real-time Call Monitoring Endpoints
@@ -164,13 +187,14 @@ async def start_call_monitoring(call_id: str = Form(...)):
 @app.post("/upload_realtime_chunk/")
 async def upload_realtime_chunk(
     file: UploadFile,
+    background_tasks: BackgroundTasks,
     call_id: str = Form(...),
     chunk_number: int = Form(...)
 ):
     """Handle real-time audio chunks with WebSocket notifications"""
     
     # Process chunk using existing logic
-    result = await upload_chunk(file, call_id, chunk_number)
+    result = await upload_chunk(file, background_tasks, call_id, chunk_number)
     
     # Add timestamp for real-time tracking
     result["timestamp"] = time.time()
